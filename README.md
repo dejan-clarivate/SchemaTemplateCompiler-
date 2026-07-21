@@ -18,7 +18,7 @@ supports:
 ## Install
 
 ```powershell
-pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.1.0
+pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.1.1
 ```
 
 For development from a local checkout:

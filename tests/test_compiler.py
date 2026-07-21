@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import tempfile
 import unittest
 
@@ -44,6 +45,13 @@ class SchemaTemplateCompilerTests(unittest.TestCase):
             self.assertEqual(patterns["date_iso"], "^CUSTOM$")
             self.assertEqual(patterns["docket"], "^D-[0-9]+$")
             self.assertIn("zip_code", patterns)
+
+    def test_zip_code_pattern_accepts_supported_zip_plus_four_separators(self):
+        pattern = load_patterns()["zip_code"]
+        for value in ("12345", "12345-6789", "12345 6789", "123456789"):
+            self.assertIsNotNone(re.fullmatch(pattern, value), value)
+        for value in ("1234", "12345_6789", "12345  6789"):
+            self.assertIsNone(re.fullmatch(pattern, value), value)
 
     def test_constraint_spec(self):
         _, schema = compile_schema({
