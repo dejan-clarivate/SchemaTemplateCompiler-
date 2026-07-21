@@ -18,7 +18,7 @@ supports:
 ## Install
 
 ```powershell
-pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.1.1
+pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.1.2
 ```
 
 For development from a local checkout:
@@ -34,6 +34,14 @@ from schema_template_compiler import compile_schema
 
 mode, schema = compile_schema(
     {"filed_date": {"$pattern": "@date_iso"}}
+)
+```
+
+An exact constant value can be declared with `$const`:
+
+```python
+mode, schema = compile_schema(
+    {"Translators note": {"$const": "not found"}}
 )
 ```
 

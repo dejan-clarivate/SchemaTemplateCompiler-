@@ -6,6 +6,8 @@ import re
 import tempfile
 import unittest
 
+from jsonschema import Draft202012Validator
+
 from schema_template_compiler import compile_file, compile_schema, load_patterns, schema_fingerprint
 
 
@@ -60,6 +62,16 @@ class SchemaTemplateCompilerTests(unittest.TestCase):
         })
         self.assertEqual(schema["properties"]["class"]["minimum"], 1)
         self.assertEqual(schema["properties"]["kind"]["enum"], ["Trademark", "Service Mark"])
+
+    def test_const_constraint_requires_the_exact_value(self):
+        _, schema = compile_schema({"Translators note": {"$const": "not found"}})
+        field = schema["properties"]["Translators note"]
+        self.assertEqual(field["type"], ["string", "null"])
+        self.assertEqual(field["const"], "not found")
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid({"Translators note": "not found"}))
+        self.assertFalse(validator.is_valid({"Translators note": "translated"}))
+        self.assertFalse(validator.is_valid({"Translators note": None}))
 
     def test_preserves_and_validates_advanced_schema(self):
         source = {"type": "object", "properties": {"name": {"type": "string"}}}

@@ -21,7 +21,7 @@ ADVANCED_KEYWORDS = {
 }
 SPEC_KEYS = {
     "$type": "type", "$description": "description", "$pattern": "pattern",
-    "$format": "format", "$enum": "enum", "$minimum": "minimum",
+    "$format": "format", "$enum": "enum", "$const": "const", "$minimum": "minimum",
     "$maximum": "maximum", "$exclusiveMinimum": "exclusiveMinimum",
     "$exclusiveMaximum": "exclusiveMaximum", "$multipleOf": "multipleOf",
     "$minItems": "minItems", "$maxItems": "maxItems",
