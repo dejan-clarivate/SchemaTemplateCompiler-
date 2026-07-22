@@ -118,6 +118,10 @@ def compile_schema(
 def _compile_object(
     value: dict[str, Any], path: str, nullable: bool, patterns: Mapping[str, str]
 ) -> dict[str, Any]:
+    """Compile a nested object. Objects are never nullable: a null object erases
+    its declared keys, so an absent block must still be returned as the full
+    structure whose leaves carry the absence sentinel."""
+    del nullable
     properties: dict[str, Any] = {}
     required: list[str] = []
     for key, item in value.items():
@@ -126,7 +130,7 @@ def _compile_object(
         properties[key] = _compile_value(item, f"{path}.{key}", True, patterns)
         required.append(key)
     return {
-        "type": ["object", "null"] if nullable else "object",
+        "type": "object",
         "properties": properties,
         "required": required,
         "additionalProperties": False,
@@ -143,6 +147,8 @@ def _compile_spec(
             f"Allowed: {', '.join(SPEC_KEYS)}, $default"
         )
     base_type = value.get("$type", "string")
+    if base_type in ("object", "array"):
+        nullable = False
     prop: dict[str, Any] = {"type": [base_type, "null"] if nullable else base_type}
     for key, item in value.items():
         if key not in ("$type", "$default"):
@@ -187,7 +193,9 @@ def _compile_value(
             _compile_value(value[0], f"{path}[0]", False, patterns)
             if value else {"type": "string"}
         )
-        return {"type": ["array", "null"] if nullable else "array", "items": items}
+        # Arrays are never nullable for the same reason as objects: an empty
+        # list already expresses absence without discarding the declared shape.
+        return {"type": "array", "items": items}
     if value is None:
         raise ValueError(f"Null at {path}: type is ambiguous, use '' or 0 instead")
     raise ValueError(f"Unsupported template value at {path}: {value!r}")

@@ -8,6 +8,8 @@ supports:
 
 - nested objects and typed example values;
 - required properties and `additionalProperties: false`;
+- non-nullable objects and arrays, so a declared structure is always returned
+  with its keys and absence is expressed on the leaves;
 - descriptions from non-empty string values;
 - `$`-prefixed constraint specifications;
 - reusable named patterns such as `@date_iso`;
@@ -18,7 +20,7 @@ supports:
 ## Install
 
 ```powershell
-pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.1.2
+pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.1.3
 ```
 
 For development from a local checkout:

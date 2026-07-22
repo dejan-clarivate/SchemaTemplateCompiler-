@@ -19,7 +19,7 @@ class SchemaTemplateCompilerTests(unittest.TestCase):
         })
         self.assertEqual(mode, "simple")
         self.assertEqual(schema["properties"]["mark_name"]["type"], ["string", "null"])
-        self.assertEqual(schema["properties"]["owner"]["type"], ["object", "null"])
+        self.assertEqual(schema["properties"]["owner"]["type"], "object")
         self.assertEqual(schema["properties"]["nice_classes"]["items"]["type"], "integer")
         self.assertEqual(schema["required"], ["mark_name", "owner", "nice_classes", "active"])
         self.assertFalse(schema["additionalProperties"])
@@ -72,6 +72,32 @@ class SchemaTemplateCompilerTests(unittest.TestCase):
         self.assertTrue(validator.is_valid({"Translators note": "not found"}))
         self.assertFalse(validator.is_valid({"Translators note": "translated"}))
         self.assertFalse(validator.is_valid({"Translators note": None}))
+
+    def test_objects_and_arrays_are_never_nullable_at_any_depth(self):
+        _, schema = compile_schema({
+            "applicant": {"first": "", "address": {"city": ""}},
+            "uses": [],
+            "spec_object": {"$type": "object"},
+            "spec_array": {"$type": "array"},
+        })
+        applicant = schema["properties"]["applicant"]
+        self.assertEqual(applicant["type"], "object")
+        self.assertEqual(applicant["properties"]["address"]["type"], "object")
+        self.assertEqual(schema["properties"]["uses"]["type"], "array")
+        self.assertEqual(schema["properties"]["spec_object"]["type"], "object")
+        self.assertEqual(schema["properties"]["spec_array"]["type"], "array")
+        validator = Draft202012Validator(schema)
+        for absent in ("applicant", "uses"):
+            instance = {
+                "applicant": {"first": None, "address": {"city": None}},
+                "uses": [], "spec_object": {}, "spec_array": [],
+            }
+            instance[absent] = None
+            self.assertFalse(validator.is_valid(instance), absent)
+        self.assertTrue(validator.is_valid({
+            "applicant": {"first": None, "address": {"city": None}},
+            "uses": [], "spec_object": {}, "spec_array": [],
+        }))
 
     def test_preserves_and_validates_advanced_schema(self):
         source = {"type": "object", "properties": {"name": {"type": "string"}}}
