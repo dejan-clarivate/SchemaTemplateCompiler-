@@ -99,6 +99,58 @@ class SchemaTemplateCompilerTests(unittest.TestCase):
             "uses": [], "spec_object": {}, "spec_array": [],
         }))
 
+    def test_string_or_array_type_list_compiles_to_any_of(self):
+        _, schema = compile_schema({
+            "Applicant Name": {"$type": ["string", "array"], "$description": "One name, or a list of several."},
+        })
+        field = schema["properties"]["Applicant Name"]
+        self.assertEqual(field["description"], "One name, or a list of several.")
+        self.assertEqual(field["anyOf"], [
+            {"type": ["string", "null"]},
+            {"type": "array", "items": {"type": "string"}},
+        ])
+        validator = Draft202012Validator(schema)
+        for value in ("5 RIVERS INC", None, ["Gold Star Mortgage", "Radiant Mortgage, LLC"], []):
+            self.assertTrue(validator.is_valid({"Applicant Name": value}), value)
+        for value in (3, [None], ["ok", 3]):
+            self.assertFalse(validator.is_valid({"Applicant Name": value}), value)
+
+    def test_type_list_constraints_apply_to_scalars_and_array_items(self):
+        _, schema = compile_schema({
+            "date": {"$type": ["string", "array"], "$pattern": "@date_iso", "$maxItems": 2},
+            "class": {"$type": ["integer", "array"], "$minimum": 1},
+        })
+        date_branches = schema["properties"]["date"]["anyOf"]
+        sentinel_pattern = r"^\d{4}-\d{2}-\d{2}$|^not\ found$"
+        self.assertEqual(date_branches[0]["pattern"], sentinel_pattern)
+        self.assertEqual(date_branches[1]["items"]["pattern"], sentinel_pattern)
+        self.assertEqual(date_branches[1]["maxItems"], 2)
+        self.assertNotIn("maxItems", date_branches[0])
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid({"date": ["2025-07-01"], "class": [1, 9]}))
+        self.assertFalse(validator.is_valid({"date": ["07/01/2025"], "class": 1}))
+        self.assertFalse(validator.is_valid({"date": "2025-07-01", "class": [0]}))
+        self.assertFalse(validator.is_valid({"date": ["2025-07-01"] * 3, "class": 1}))
+
+    def test_type_list_without_array_and_with_several_scalars(self):
+        _, schema = compile_schema({
+            "code": {"$type": ["string", "integer"]},
+            "value": {"$type": ["string", "integer", "array"]},
+        })
+        self.assertEqual(schema["properties"]["code"]["anyOf"], [
+            {"type": ["string", "null"]}, {"type": ["integer", "null"]},
+        ])
+        self.assertEqual(schema["properties"]["value"]["anyOf"][2]["items"], {
+            "anyOf": [{"type": "string"}, {"type": "integer"}],
+        })
+
+    def test_rejects_invalid_type_lists(self):
+        for bad in (["string"], ["array"], ["string", "string"], ["string", "object"], ["string", "null"]):
+            with self.assertRaisesRegex(ValueError, r"\$type list at \$\.name"):
+                compile_schema({"name": {"$type": bad}})
+        with self.assertRaisesRegex(ValueError, "need 'array' in \\$type"):
+            compile_schema({"name": {"$type": ["string", "integer"], "$maxItems": 2}})
+
     def test_preserves_and_validates_advanced_schema(self):
         source = {"type": "object", "properties": {"name": {"type": "string"}}}
         mode, schema = compile_schema(source)

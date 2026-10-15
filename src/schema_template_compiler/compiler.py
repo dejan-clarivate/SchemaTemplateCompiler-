@@ -26,6 +26,8 @@ SPEC_KEYS = {
     "$exclusiveMaximum": "exclusiveMaximum", "$multipleOf": "multipleOf",
     "$minItems": "minItems", "$maxItems": "maxItems",
 }
+# Types a "$type" list may combine; objects need fields, so they stay out
+UNION_TYPES = ("string", "integer", "number", "boolean", "array")
 PATTERNS_FILENAME = "_patterns.json"
 DEFAULT_SENTINEL = "not found"
 SENTINEL_INSTRUCTION = (
@@ -147,6 +149,8 @@ def _compile_spec(
             f"Allowed: {', '.join(SPEC_KEYS)}, $default"
         )
     base_type = value.get("$type", "string")
+    if isinstance(base_type, list):
+        return _compile_union(value, path, nullable, patterns)
     if base_type in ("object", "array"):
         nullable = False
     prop: dict[str, Any] = {"type": [base_type, "null"] if nullable else base_type}
@@ -162,6 +166,53 @@ def _compile_spec(
     elif "$default" in value:
         raise ValueError(f"$default at {path} only applies to string fields with a $pattern")
     return prop
+
+
+def _compile_union(
+    value: dict[str, Any], path: str, nullable: bool, patterns: Mapping[str, str]
+) -> dict[str, Any]:
+    """Compile ``"$type": [...]`` into ``anyOf``: one branch per scalar type, and
+    with "array", a list of those scalars. The other spec keys constrain each
+    scalar, whether it stands alone or is an array item; $minItems and $maxItems
+    constrain the array."""
+    types = value["$type"]
+    unsupported = [item for item in types if item not in UNION_TYPES]
+    if len(types) < 2 or len(set(types)) != len(types) or unsupported:
+        raise ValueError(
+            f"$type list at {path} must name two or more distinct types from "
+            f"{', '.join(UNION_TYPES)}, got {types!r}"
+        )
+    scalars = [item for item in types if item != "array"]
+    if not scalars:
+        raise ValueError(f"$type list at {path} needs a scalar type besides 'array'")
+    array_keys = {"$minItems", "$maxItems"}
+    if "array" not in types and array_keys & set(value):
+        raise ValueError(f"$minItems/$maxItems at {path} need 'array' in $type")
+
+    union: dict[str, Any] = {}
+    if "$description" in value:
+        union["description"] = value["$description"]
+    scalar_spec = {
+        key: item for key, item in value.items()
+        if key not in array_keys | {"$type", "$description"}
+    }
+
+    def scalar(type_name: str, scalar_nullable: bool) -> dict[str, Any]:
+        return _compile_spec({**scalar_spec, "$type": type_name}, path, scalar_nullable, patterns)
+
+    branches = [scalar(type_name, nullable) for type_name in scalars]
+    if "array" in types:
+        # Items are not nullable: a missing value is an empty list, as for any array
+        items = [scalar(type_name, False) for type_name in scalars]
+        array: dict[str, Any] = {
+            "type": "array",
+            "items": items[0] if len(items) == 1 else {"anyOf": items},
+        }
+        for key in sorted(array_keys & set(value)):
+            array[SPEC_KEYS[key]] = value[key]
+        branches.append(array)
+    union["anyOf"] = branches
+    return union
 
 
 def _compile_value(

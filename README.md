@@ -12,6 +12,7 @@ supports:
   with its keys and absence is expressed on the leaves;
 - descriptions from non-empty string values;
 - `$`-prefixed constraint specifications;
+- fields that take one of several types, such as a string or an array of strings;
 - reusable named patterns such as `@date_iso`;
 - project-specific `_patterns.json` overrides;
 - an absence sentinel compatible with constrained decoding;
@@ -20,7 +21,7 @@ supports:
 ## Install
 
 ```powershell
-pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.1.3
+pip install git+https://github.com/dejan-clarivate/SchemaTemplateCompiler-.git@v0.2.0
 ```
 
 For development from a local checkout:
@@ -46,6 +47,20 @@ mode, schema = compile_schema(
     {"Translators note": {"$const": "not found"}}
 )
 ```
+
+A list of types in `$type` lets a field take any of them, compiled to `anyOf`.
+With `"array"` in the list, the field may also be a list of the other types:
+
+```python
+mode, schema = compile_schema(
+    {"Applicant Name": {"$type": ["string", "array"]}}
+)
+# "Applicant Name": "5 RIVERS INC"  or  ["Gold Star Mortgage", "Radiant Mortgage, LLC"]
+```
+
+The other `$` keys (`$pattern`, `$enum`, `$minimum`, ...) constrain each
+value, whether it stands alone or is an array item; `$minItems` and `$maxItems`
+constrain the array. Objects cannot be part of a type list.
 
 `@date_iso` resolves to `^\\d{4}-\\d{2}-\\d{2}$`. String patterns also admit
 the default absence sentinel, so the resulting pattern ends with
